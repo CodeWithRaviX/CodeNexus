@@ -14,6 +14,19 @@ import { useFileSystem } from "./FileContext"
 
 const RunCodeContext = createContext<RunContextType | null>(null)
 
+const fallbackLanguages = [
+    {
+        language: "python",
+        version: "3.13.0",
+        aliases: ["py", "python", "python3"],
+    },
+    {
+        language: "javascript",
+        version: "18.x",
+        aliases: ["js", "javascript", "node", "nodejs"],
+    },
+]
+
 const isAxiosError = (
     error: unknown,
 ): error is { response?: { data?: unknown } } =>
@@ -47,7 +60,7 @@ const RunCodeContextProvider = ({ children }: { children: ReactNode }) => {
                 const languages = await axiosInstance.get("/runtimes")
                 const runtimes = Array.isArray(languages.data)
                     ? languages.data
-                    : []
+                    : fallbackLanguages
                 setSupportedLanguages(runtimes)
 
                 if (activeFile?.name) {
@@ -60,7 +73,7 @@ const RunCodeContextProvider = ({ children }: { children: ReactNode }) => {
                     }
                 }
             } catch (error: unknown) {
-                setSupportedLanguages([])
+                setSupportedLanguages(fallbackLanguages)
                 setSelectedLanguage({ language: "", version: "", aliases: [] })
                 setOutput("")
                 toast.dismiss()

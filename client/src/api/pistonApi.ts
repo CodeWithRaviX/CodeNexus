@@ -14,8 +14,8 @@ const getDefaultApiBaseUrl = () => {
 }
 
 const pistonBaseUrl =
-    import.meta.env.VITE_PISTON_API_URL ||
     import.meta.env.VITE_BACKEND_URL ||
+    import.meta.env.VITE_PISTON_API_URL ||
     getDefaultApiBaseUrl()
 
 const instance: AxiosInstance = axios.create({
