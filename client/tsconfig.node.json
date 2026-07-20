@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+        "composite": true,
+        "skipLibCheck": true,
+        "ignoreDeprecations": "6.0",
+        "module": "ES2020",
+        "moduleResolution": "node",
+        "allowSyntheticDefaultImports": true,
+        "strict": true
+    },
+    "include": ["vite.config.mts"]
+}

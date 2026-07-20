@@ -1,0 +1,7 @@
+services:
+  piston:
+    image: ghcr.io/engineer-man/piston:latest
+    container_name: piston
+    ports:
+      - "2000:2000"
+    restart: unless-stopped
