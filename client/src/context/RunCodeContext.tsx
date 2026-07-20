@@ -63,7 +63,7 @@ const RunCodeContextProvider = ({ children }: { children: ReactNode }) => {
                 setSupportedLanguages([])
                 setSelectedLanguage({ language: "", version: "", aliases: [] })
                 setOutput(
-                    "Code execution is unavailable because no Piston runner is reachable. Start a local runner on port 2000 or set VITE_PISTON_API_URL to a working endpoint.",
+                    "Code execution is unavailable because the runner endpoint is unreachable. Set VITE_PISTON_API_URL to a working Piston service if you want live execution.",
                 )
                 toast.error("Code execution is unavailable")
                 if (isAxiosError(error) && error.response?.data)
@@ -130,7 +130,7 @@ const RunCodeContextProvider = ({ children }: { children: ReactNode }) => {
             setIsRunning(false)
             toast.dismiss()
             toast.error(
-                "Execution failed because the runner service is unavailable or blocked.",
+                "Execution failed because the runner service is unavailable or blocked. Configure VITE_PISTON_API_URL with a reachable Piston endpoint.",
             )
         }
     }

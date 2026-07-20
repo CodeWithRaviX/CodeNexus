@@ -27,8 +27,20 @@ export const useSocket = (): SocketContextType => {
     return context
 }
 
-const BACKEND_URL =
-    import.meta.env.VITE_BACKEND_URL || "https://codenexus-f4yf.onrender.com"
+const getDefaultBackendUrl = () => {
+    if (typeof window === "undefined") {
+        return "http://localhost:3000"
+    }
+
+    const host = window.location.hostname
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+        return "http://localhost:3000"
+    }
+
+    return window.location.origin
+}
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || getDefaultBackendUrl()
 
 const SocketProvider = ({ children }: { children: ReactNode }) => {
     const {

@@ -6,6 +6,7 @@ import { SocketEvent, SocketId } from "./types/socket";
 import { USER_CONNECTION_STATUS, User } from "./types/user";
 import { Server } from "socket.io";
 import path from "path";
+import { getSupportedRuntimes, runCode } from "./codeRunner";
 
 dotenv.config();
 
@@ -325,6 +326,21 @@ app.get("/", (req: Request, res: Response) => {
   // Send the index.html file
   res.sendFile(path.join(__dirname, "..", "public", "index.html"));
 });
+
+app.get("/runtimes", (_req: Request, res: Response) => {
+  res.json(getSupportedRuntimes());
+});
+
+app.post("/execute", async (req: Request, res: Response) => {
+  try {
+    const result = await runCode(req.body);
+    res.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Execution failed";
+    res.status(400).json({ error: message });
+  }
+});
+
 console.log("Before listen");
 server.listen(PORT, () => {
   console.log(`Listening on port ${PORT}`);

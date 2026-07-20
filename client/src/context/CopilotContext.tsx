@@ -30,7 +30,7 @@ const CopilotContextProvider = ({ children }: { children: ReactNode }) => {
 
             toast.loading("Generating code...")
             setIsRunning(true)
-            const response = await axiosInstance.post("/", {
+            const response = await axiosInstance.post("/openai", {
                 messages: [
                     {
                         role: "system",
@@ -45,10 +45,12 @@ const CopilotContextProvider = ({ children }: { children: ReactNode }) => {
                 model: "mistral",
                 private: true,
             })
-            if (response.data) {
+            const content = response?.data?.choices?.[0]?.message?.content
+            if (content) {
                 toast.success("Code generated successfully")
-                const code = response.data
-                if (code) setOutput(code)
+                setOutput(content)
+            } else {
+                throw new Error("No response content received")
             }
             setIsRunning(false)
             toast.dismiss()
@@ -56,7 +58,9 @@ const CopilotContextProvider = ({ children }: { children: ReactNode }) => {
             console.error(error)
             setIsRunning(false)
             toast.dismiss()
-            toast.error("Failed to generate the code")
+            toast.error(
+                "Code generation is currently unavailable. Try again later or configure a different AI endpoint.",
+            )
         }
     }
 
