@@ -63,9 +63,20 @@ https://your-vercel-url.vercel.app
 
 ## ⚙ Installation
 
+### Runtime service for code execution
+
+If you run the app with Docker Compose, make sure the Piston service is available on port 2000 and the client points to it:
+
+```env
+VITE_PISTON_API_URL=http://localhost:2000
+```
+
+In production or inside the Docker network, the server also uses the internal host `http://piston:2000` automatically when no explicit Piston URL is set.
+
 ### Clone Repository
 
 ```bash
 git clone https://github.com/CodeWithRaviX/CodeNexus.git
 
 cd CodeNexus
+```

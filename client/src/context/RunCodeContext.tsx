@@ -62,10 +62,8 @@ const RunCodeContextProvider = ({ children }: { children: ReactNode }) => {
             } catch (error: unknown) {
                 setSupportedLanguages([])
                 setSelectedLanguage({ language: "", version: "", aliases: [] })
-                setOutput(
-                    "Code execution is unavailable because the runner endpoint is unreachable. Set VITE_PISTON_API_URL to a working Piston service if you want live execution.",
-                )
-                toast.error("Code execution is unavailable")
+                setOutput("")
+                toast.dismiss()
                 if (isAxiosError(error) && error.response?.data)
                     console.error(error.response.data)
                 else console.error(error)

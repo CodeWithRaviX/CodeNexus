@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import { promises as fs } from "fs";
 import os from "os";
 import path from "path";
+import process from "process";
 
 export interface ExecutionFile {
   name: string;
@@ -30,6 +31,19 @@ export interface ExecutionResult {
 }
 
 const DEFAULT_TIMEOUT_MS = 10000;
+
+export const resolveExecutionBackend = (
+  env: NodeJS.ProcessEnv = process.env,
+): string => {
+  const configuredUrl = env.PISTON_API_URL || env.VITE_PISTON_API_URL;
+  if (configuredUrl) return configuredUrl;
+
+  if (env.DOCKER_CONTAINER || env.ENVIRONMENT === "production") {
+    return "http://piston:2000";
+  }
+
+  return "http://localhost:2000";
+};
 
 const runtimeDefinitions: RuntimeDefinition[] = [
   {
@@ -76,79 +90,127 @@ const getRuntimeCommand = (language: string) => {
 export const getSupportedRuntimes = (): RuntimeDefinition[] =>
   runtimeDefinitions;
 
-export const runCode = async (
+const runViaPiston = async (
   request: ExecutionRequest,
 ): Promise<ExecutionResult> => {
-  const runtime = getRuntimeCommand(request.language);
+  const backendUrl = resolveExecutionBackend();
+  const response = await fetch(`${backendUrl}/api/v2/execute`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      language: request.language,
+      version: request.version,
+      files: request.files,
+      stdin: request.stdin ?? "",
+    }),
+  });
 
-  if (!runtime) {
+  if (!response.ok) {
+    const errorText = await response.text();
     throw new Error(
-      `Unsupported language: ${request.language}. Supported runtimes: python, javascript.`,
+      `Piston execution failed (${response.status}): ${errorText || "unknown error"}`,
     );
   }
 
-  const file = request.files?.[0];
-  if (!file?.name || !file.content) {
-    throw new Error("A file with content is required for execution.");
-  }
+  const data = (await response.json()) as {
+    run?: { stdout?: string; stderr?: string; code?: number };
+  };
 
-  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "code-sync-"));
-  const fileName = file.name.includes(".")
-    ? file.name
-    : `main.${runtime.extension}`;
-  const filePath = path.join(workDir, fileName);
+  return {
+    run: {
+      stdout: data.run?.stdout ?? "",
+      stderr: data.run?.stderr ?? "",
+      code: data.run?.code ?? 0,
+    },
+  };
+};
 
+export const runCode = async (
+  request: ExecutionRequest,
+): Promise<ExecutionResult> => {
   try {
-    await fs.writeFile(filePath, file.content, "utf8");
+    return await runViaPiston(request);
+  } catch (pistonError) {
+    const fallbackMessage =
+      pistonError instanceof Error ? pistonError.message : "Piston unavailable";
 
-    const child = spawn(runtime.command, [filePath], {
-      cwd: workDir,
-      env: {
-        ...process.env,
-        NODE_NO_WARNINGS: "1",
-      },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    if (process.env.PISTON_API_URL || process.env.VITE_PISTON_API_URL) {
+      throw new Error(`Piston execution failed: ${fallbackMessage}`);
+    }
 
-    let stdout = "";
-    let stderr = "";
+    const runtime = getRuntimeCommand(request.language);
 
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk;
-    });
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk;
-    });
+    if (!runtime) {
+      throw new Error(
+        `Unsupported language: ${request.language}. Supported runtimes: python, javascript.`,
+      );
+    }
 
-    child.stdin.write(request.stdin ?? "");
-    child.stdin.end();
+    const file = request.files?.[0];
+    if (!file?.name || !file.content) {
+      throw new Error("A file with content is required for execution.");
+    }
 
-    const exitCode = await new Promise<number>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        child.kill("SIGKILL");
-      }, DEFAULT_TIMEOUT_MS);
+    const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "code-sync-"));
+    const fileName = file.name.includes(".")
+      ? file.name
+      : `main.${runtime.extension}`;
+    const filePath = path.join(workDir, fileName);
 
-      child.on("error", (error) => {
-        clearTimeout(timeout);
-        reject(error);
+    try {
+      await fs.writeFile(filePath, file.content, "utf8");
+
+      const child = spawn(runtime.command, [filePath], {
+        cwd: workDir,
+        env: {
+          ...process.env,
+          NODE_NO_WARNINGS: "1",
+        },
+        stdio: ["pipe", "pipe", "pipe"],
       });
 
-      child.on("close", (code) => {
-        clearTimeout(timeout);
-        resolve(code ?? 1);
-      });
-    });
+      let stdout = "";
+      let stderr = "";
 
-    return {
-      run: {
-        stdout,
-        stderr,
-        code: exitCode,
-      },
-    };
-  } finally {
-    await fs.rm(workDir, { recursive: true, force: true });
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
+      child.stdout.on("data", (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+
+      child.stdin.write(request.stdin ?? "");
+      child.stdin.end();
+
+      const exitCode = await new Promise<number>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          child.kill("SIGKILL");
+        }, DEFAULT_TIMEOUT_MS);
+
+        child.on("error", (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+
+        child.on("close", (code) => {
+          clearTimeout(timeout);
+          resolve(code ?? 1);
+        });
+      });
+
+      return {
+        run: {
+          stdout,
+          stderr,
+          code: exitCode,
+        },
+      };
+    } finally {
+      await fs.rm(workDir, { recursive: true, force: true });
+    }
   }
 };

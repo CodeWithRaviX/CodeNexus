@@ -6,7 +6,11 @@ import { SocketEvent, SocketId } from "./types/socket";
 import { USER_CONNECTION_STATUS, User } from "./types/user";
 import { Server } from "socket.io";
 import path from "path";
-import { getSupportedRuntimes, runCode } from "./codeRunner";
+import {
+  getSupportedRuntimes,
+  resolveExecutionBackend,
+  runCode,
+} from "./codeRunner";
 
 dotenv.config();
 
@@ -329,6 +333,13 @@ app.get("/", (req: Request, res: Response) => {
 
 app.get("/runtimes", (_req: Request, res: Response) => {
   res.json(getSupportedRuntimes());
+});
+
+app.get("/health", (_req: Request, res: Response) => {
+  res.json({
+    status: "ok",
+    pistonApiUrl: resolveExecutionBackend(),
+  });
 });
 
 app.post("/execute", async (req: Request, res: Response) => {
